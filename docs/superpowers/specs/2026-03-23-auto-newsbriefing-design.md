@@ -67,6 +67,7 @@ auto-newsbriefing/
 └── tests/
     ├── test_config.py
     ├── test_dedup.py
+    ├── test_classifier.py
     └── test_prompts.py
 ```
 
@@ -157,13 +158,14 @@ OPENAI_API_KEY=
 GOOGLE_API_KEY=
 
 # Google Sheets
-GOOGLE_SHEETS_CREDENTIALS=    # 서비스 계정 JSON 경로
+GOOGLE_SHEETS_CREDENTIALS=    # 서비스 계정 JSON 경로 (로컬)
+                              # CI: base64 인코딩 후 GOOGLE_SHEETS_CREDENTIALS_B64 secret에 저장
 
 # Email (선택)
 SMTP_USER=
 SMTP_PASS=
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
+SMTP_HOST=smtp.gmail.com      # 기본값, mailer.py에서 폴백
+SMTP_PORT=587                  # 기본값, mailer.py에서 폴백
 ```
 
 ---
@@ -195,8 +197,24 @@ class LLMProvider(ABC):
 ### 동작 방식
 
 - `config.yaml`의 `llm.provider`로 선택, `llm.model`로 오버라이드
-- `complete_json()`은 JSON 파싱 실패 시 3회 재시도 + 폴백 (현재 로직 보존)
+- `complete_json()` 구현은 프로바이더별 최적화:
+  - **OpenAI:** `response_format: { type: "json_object" }` 네이티브 JSON 모드 사용
+  - **Gemini:** `response_mime_type: "application/json"` 사용
+  - **Claude:** 프롬프트 기반 JSON 출력 + 응답 파싱
+  - 공통: 파싱 실패 시 3회 재시도, 최종 실패 시 저신뢰 폴백
 - 프롬프트는 `classifier.py`에서 config의 domain/categories를 주입해서 생성
+
+### 프롬프트 구조
+
+**LLM 1차 호출 (Top-N 선별):**
+- System: `"당신은 {domain.name} 분야의 전문 편집자입니다. {domain.description}에 관한 뉴스 중 가장 중요한 {top_n}건을 선별하세요."`
+- User: 후보 기사 목록 (제목 + 설명 + 소스)
+- Output: 선별된 URL 목록 (JSON)
+
+**LLM 2차 호출 (개별 요약/분류):**
+- System: `"당신은 {domain.name} 분야 브리핑 AI입니다. 기사를 분석하여 요약, 카테고리, 이벤트 정보를 추출하세요. 카테고리: {categories 목록}. 출력 언어: {domain.language}."`
+- User: 기사 제목 + 소스 + URL + 본문
+- Output: `{ summary: [3줄], category: str, event: { jurisdiction, event_type, actors, object, action, time_hint } }`
 
 ---
 
@@ -248,6 +266,49 @@ main.py 실행
 - **2단계 LLM 호출:** Top-N 선별 → 개별 요약/분류
 - **Graceful degradation:** 피드 실패 무시, LLM 실패 시 폴백, 이메일 실패해도 Sheets 업로드 유지
 
+### 로깅
+
+- Python `logging` 모듈 사용 (print 기반에서 전환)
+- 기본 레벨: `INFO` (환경변수 `LOG_LEVEL`로 오버라이드)
+- 포맷: `[%(levelname)s] %(name)s: %(message)s`
+- GitHub Actions에서는 stdout으로 출력 (별도 파일 저장 불필요)
+- 각 파이프라인 단계 시작/종료 로그 + 수집/필터/선별 건수 요약
+
+### EventKey 생성 방식
+
+LLM이 기사별로 반환하는 이벤트 메타데이터를 기반으로 핑거프린트 해시 생성:
+
+```
+EventKey = SHA256(
+    jurisdiction + event_type + sorted(actors) + object + action + time_bucket
+)[:hash_len]
+```
+
+- `jurisdiction`: 관할권 (e.g., "FTC", "EU", "KOREA")
+- `event_type`: enforcement | legislation | litigation | policy | security_incident | business | other
+- `actors`: 관련 주체 (정렬 후 결합)
+- `object`: 대상 (e.g., "loot box regulation")
+- `action`: 행위 (e.g., "filed complaint")
+- `time_bucket`: config의 `event_time_bucket`에 따라 월/주 단위 버킷
+- `hash_len`: config의 truncation 길이 (기본 16자)
+
+동일 EventKey = 동일 실세계 이벤트 → 대표 기사 1건만 브리핑, 나머지는 Sheets에 DuplicateOf로 기록
+
+### trends/ 로컬 아카이브 형식
+
+파일명: `trends/trend_YYYY-MM-DD.txt`
+
+```
+[CATEGORY] 기사 제목
+URL: https://...
+Summary: 요약 1줄 | 요약 2줄 | 요약 3줄
+EventKey: abc123def456
+---
+```
+
+- 파이프라인 실행일 기준 1파일, 중복제거 시 과거 30일치 로드
+- GitHub Actions에서 자동 커밋되어 git 히스토리에 보존
+
 ### CLI 옵션 (원본 보존)
 
 ```bash
@@ -286,7 +347,7 @@ python -m pipeline.setup.wizard
     │
     ├─ Step 6: Google Sheets 자동 생성 (sheets_creator.py)
     │   ├─ 스프레드시트 생성
-    │   ├─ 헤더 행 세팅 (Title, URL, Category, Summary, Date, EventKey, Source)
+    │   ├─ 헤더 행 세팅 (Section 7 스키마 참조: Date~RunDate 11열)
     │   └─ spreadsheet_id를 config.yaml에 자동 기입
     │
     ├─ Step 7: 이메일 수신자 등록
@@ -363,7 +424,7 @@ python-dotenv>=1.0.0
 name: Auto News Briefing
 on:
   schedule:
-    - cron: ${{ vars.BRIEFING_CRON || '7 1 * * 1,3,5' }}
+    - cron: '7 1 * * 1,3,5'       # 사용자가 직접 편집 (config.yaml의 schedule.cron 참조)
   workflow_dispatch:
 
 jobs:
@@ -375,12 +436,16 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+      - name: Decode Google Sheets credentials
+        run: echo "$GOOGLE_SHEETS_CREDENTIALS_B64" | base64 -d > /tmp/gsheets-creds.json
+        env:
+          GOOGLE_SHEETS_CREDENTIALS_B64: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS_B64 }}
       - run: python main.py
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          GOOGLE_SHEETS_CREDENTIALS: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}
+          GOOGLE_SHEETS_CREDENTIALS: /tmp/gsheets-creds.json
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           TZ: ${{ vars.BRIEFING_TZ || 'Asia/Seoul' }}
@@ -392,5 +457,7 @@ jobs:
 
 ### config → workflow 연동
 
-- `schedule.cron` 값은 config.yaml에서 관리, GitHub Repository Variables(`BRIEFING_CRON`)에 동기화
-- `schedule.timezone`은 `BRIEFING_TZ` variable로 전달
+- `schedule.cron`은 workflow 파일에 직접 편집 (GitHub Actions는 cron을 리터럴로만 파싱)
+- config.yaml의 `schedule.cron`은 문서/참조용으로 유지, setup wizard가 README에 설정 방법 안내
+- `schedule.timezone`은 `BRIEFING_TZ` Repository Variable로 전달
+- **Google Sheets 인증:** 서비스 계정 JSON을 base64 인코딩하여 `GOOGLE_SHEETS_CREDENTIALS_B64` secret에 저장, workflow에서 디코딩하여 임시 파일로 사용
