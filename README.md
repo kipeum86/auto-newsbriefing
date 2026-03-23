@@ -16,20 +16,18 @@ Collect news via RSS, classify and summarize with AI, archive to Google Sheets, 
 [**한국어**](README_KO.md)
 
 ```mermaid
-graph LR
+graph TD
     subgraph Collect["📡 Collect"]
-        A["RSS Feeds<br/><sub>Tier A · Tier B</sub>"]
+        A["RSS Feeds — Tier A · Tier B"]
     end
 
     subgraph Dedup1["🧹 Pre-LLM Dedup"]
-        B["URL Normalize"]
-        C["Topic Tokens"]
-        B --> C
+        B["URL Normalize → Topic Token Similarity"]
     end
 
     subgraph AI["🤖 AI Engine"]
         D["Keyword Filter"]
-        E["LLM Top-N Select"]
+        E["LLM Top-N Selection"]
         F["Summarize & Classify"]
         G["EventKey Dedup"]
         D --> E --> F --> G
@@ -41,8 +39,7 @@ graph LR
         J["trends/ Archive"]
     end
 
-    A --> B
-    C --> D
+    A --> B --> D
     G --> H & I & J
 
     style Collect fill:#1a1a2e,stroke:#1a1a2e,color:#fff
