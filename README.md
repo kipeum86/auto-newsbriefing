@@ -1,6 +1,40 @@
+<div align="center">
+
 # auto-newsbriefing
 
-Domain-agnostic RSS newsletter automation. Collect news via RSS, classify and summarize with AI, archive to Google Sheets, and deliver email briefings — all on autopilot.
+**RSS → AI → Briefing**
+
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Claude](https://img.shields.io/badge/Claude-d4a574?style=for-the-badge&logo=anthropic&logoColor=white)](https://anthropic.com)
+[![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)](https://openai.com)
+[![Gemini](https://img.shields.io/badge/Gemini-8E75B2?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
+
+Domain-agnostic RSS newsletter automation.<br>
+Collect news via RSS, classify and summarize with AI, archive to Google Sheets, and deliver email briefings — all on autopilot.
+
+[**한국어**](README_KO.md)
+
+```
+   RSS Feeds          AI Engine          Output
+ ┌──────────┐     ┌──────────────┐     ┌──────────────┐
+ │ Tier A   │────▶│  Keyword     │────▶│ Google Sheets│
+ │ Tier B   │     │  Filter      │     │   Archive    │
+ └──────────┘     │      ▼       │     ├──────────────┤
+       │          │  LLM Top-N   │     │  HTML Email  │
+       ▼          │  Selection   │     │   Briefing   │
+  3-Stage         │      ▼       │     ├──────────────┤
+  Dedup           │  Summarize   │     │  trends/     │
+  (URL→Token      │  & Classify  │     │   Archive    │
+   →EventKey)     │      ▼       │     └──────────────┘
+                  │  EventKey    │
+                  │  Dedup       │
+                  └──────────────┘
+```
+
+</div>
+
+---
 
 ## Features
 
@@ -254,9 +288,9 @@ pipeline/
 | GitHub Actions: credentials decode error | Re-encode JSON with `cat file.json \| base64` (no line breaks) |
 | `0 articles after keyword filter` | Broaden `keywords.include` in config or set to `[]` to skip filtering |
 
-## 한국어 가이드
+## 한국어
 
-한국어 셋업 가이드는 [docs/SETUP_KO.md](docs/SETUP_KO.md)를 참조하세요.
+한국어 문서는 [README_KO.md](README_KO.md)를 참조하세요.
 
 ## License
 
