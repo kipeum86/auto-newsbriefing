@@ -15,21 +15,40 @@ Collect news via RSS, classify and summarize with AI, archive to Google Sheets, 
 
 [**한국어**](README_KO.md)
 
-```
-   RSS Feeds          AI Engine          Output
- ┌──────────┐     ┌──────────────┐     ┌──────────────┐
- │ Tier A   │────▶│  Keyword     │────▶│ Google Sheets│
- │ Tier B   │     │  Filter      │     │   Archive    │
- └──────────┘     │      ▼       │     ├──────────────┤
-       │          │  LLM Top-N   │     │  HTML Email  │
-       ▼          │  Selection   │     │   Briefing   │
-  3-Stage         │      ▼       │     ├──────────────┤
-  Dedup           │  Summarize   │     │  trends/     │
-  (URL→Token      │  & Classify  │     │   Archive    │
-   →EventKey)     │      ▼       │     └──────────────┘
-                  │  EventKey    │
-                  │  Dedup       │
-                  └──────────────┘
+```mermaid
+graph LR
+    subgraph Collect["📡 Collect"]
+        A["RSS Feeds<br/><sub>Tier A · Tier B</sub>"]
+    end
+
+    subgraph Dedup1["🧹 Pre-LLM Dedup"]
+        B["URL Normalize"]
+        C["Topic Tokens"]
+        B --> C
+    end
+
+    subgraph AI["🤖 AI Engine"]
+        D["Keyword Filter"]
+        E["LLM Top-N Select"]
+        F["Summarize & Classify"]
+        G["EventKey Dedup"]
+        D --> E --> F --> G
+    end
+
+    subgraph Output["📤 Output"]
+        H["Google Sheets"]
+        I["Email Briefing"]
+        J["trends/ Archive"]
+    end
+
+    A --> B
+    C --> D
+    G --> H & I & J
+
+    style Collect fill:#1a1a2e,stroke:#1a1a2e,color:#fff
+    style Dedup1 fill:#16213e,stroke:#16213e,color:#fff
+    style AI fill:#0f3460,stroke:#0f3460,color:#fff
+    style Output fill:#533483,stroke:#533483,color:#fff
 ```
 
 </div>
