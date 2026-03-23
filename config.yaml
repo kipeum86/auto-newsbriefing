@@ -1,0 +1,35 @@
+# auto-newsbriefing configuration
+# See config.example.yaml for a complete example.
+# Run `python -m pipeline.setup.wizard` for guided setup.
+
+domain:
+  name: ""
+  description: ""
+  language: "ko"
+
+categories: []
+
+keywords:
+  include: []
+  exclude: []
+
+sources:
+  tier_a: []
+  tier_b: []
+
+llm:
+  provider: "claude"
+  model: ""
+
+email:
+  enabled: true
+  sender_name: ""
+  subject_prefix: ""
+  recipients: []
+
+sheets:
+  spreadsheet_id: ""
+
+schedule:
+  cron: "7 1 * * 1,3,5"
+  timezone: "Asia/Seoul"
