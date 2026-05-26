@@ -58,7 +58,7 @@ graph TD
 - **3-stage deduplication** — URL normalization → topic-token similarity → EventKey fingerprinting
 - **Google Sheets archive** — structured data store with automatic header setup
 - **HTML email briefings** — category-grouped, styled newsletters via Gmail SMTP
-- **GitHub Actions** — scheduled runs with automatic trend file commits
+- **GitHub Actions** — optional manual or scheduled runs with automatic trend file commits
 - **Setup wizard** — interactive CLI to configure everything from scratch
 - **Fully configurable** — domain, categories, keywords, sources, schedule — all in `config.yaml`
 
@@ -227,13 +227,16 @@ Go to *Settings → Secrets and variables → Actions → Variables*:
 |---------------|-------|
 | `BRIEFING_TZ` | e.g., `Asia/Seoul`, `America/New_York` |
 
-#### 6.4 Customize schedule
+#### 6.4 Enable or customize schedule
 
-Edit `.github/workflows/schedule.yml` — change the cron line:
+The included workflow is manual-only by default, so public forks do not start failing on a cron before setup is complete.
+To enable automation, edit `.github/workflows/schedule.yml` and uncomment the schedule block:
 
 ```yaml
-schedule:
-  - cron: '7 1 * * 1,3,5'   # 1:07 AM UTC on Mon/Wed/Fri
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7 1 * * 1,3,5'   # 1:07 AM UTC on Mon/Wed/Fri
 ```
 
 The workflow also supports manual triggering via *Actions → Run workflow*.

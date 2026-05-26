@@ -58,7 +58,7 @@ graph TD
 - **3단계 중복제거** — URL 정규화 → 토픽 토큰 유사도 → EventKey 핑거프린팅
 - **Google Sheets 아카이브** — 헤더 자동 생성, 구조화된 데이터 저장
 - **HTML 이메일 브리핑** — 카테고리별로 정리된 뉴스레터를 Gmail로 발송
-- **GitHub Actions 자동화** — 스케줄에 맞춰 실행, 트렌드 파일 자동 커밋
+- **GitHub Actions 자동화** — 수동 실행 또는 선택적 스케줄 실행, 트렌드 파일 자동 커밋
 - **셋업 위저드** — 대화형 CLI로 처음부터 끝까지 설정
 - **완전한 설정 분리** — 도메인, 카테고리, 키워드, 소스, 스케줄 전부 `config.yaml`에서 관리
 
@@ -227,13 +227,16 @@ cat /path/to/service-account-key.json | base64 -w 0
 |--------------|-----|
 | `BRIEFING_TZ` | `Asia/Seoul`, `America/New_York` 등 |
 
-#### 6.4 실행 스케줄 변경
+#### 6.4 실행 스케줄 활성화/변경
 
-`.github/workflows/schedule.yml` 파일에서 cron을 수정하세요:
+공개 템플릿에서 설정 전 cron 실패가 반복되지 않도록, 포함된 workflow는 기본적으로 수동 실행만 켜져 있습니다.
+자동 실행을 켜려면 `.github/workflows/schedule.yml` 파일에서 schedule 블록의 주석을 해제하고 cron을 수정하세요:
 
 ```yaml
-schedule:
-  - cron: '7 1 * * 1,3,5'   # UTC 기준 월/수/금 01:07 (한국 시간 10:07)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7 1 * * 1,3,5'   # UTC 기준 월/수/금 01:07 (한국 시간 10:07)
 ```
 
 GitHub Actions 페이지에서 *Run workflow* 버튼으로 수동 실행도 가능합니다.
